@@ -1,7 +1,8 @@
 package com.yupi.springbootinit.model.dto.user;
 
-import java.io.Serializable;
 import lombok.Data;
+
+import java.io.Serializable;
 
 /**
  * 用户创建请求
@@ -26,6 +27,21 @@ public class UserAddRequest implements Serializable {
      * 用户头像
      */
     private String userAvatar;
+
+    /**
+     * 用户简介
+     */
+    private String userProfile;
+
+    /**
+     * 用户邮箱
+     */
+    private String userEmail;
+
+    /**
+     * 用户手机号
+     */
+    private String userPhone;
 
     /**
      * 用户角色: user, admin

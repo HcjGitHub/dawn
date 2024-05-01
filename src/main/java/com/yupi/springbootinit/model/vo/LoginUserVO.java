@@ -1,8 +1,9 @@
 package com.yupi.springbootinit.model.vo;
 
+import lombok.Data;
+
 import java.io.Serializable;
 import java.util.Date;
-import lombok.Data;
 
 /**
  * 已登录用户视图（脱敏）
@@ -32,6 +33,16 @@ public class LoginUserVO implements Serializable {
      * 用户简介
      */
     private String userProfile;
+
+    /**
+     * 用户邮箱
+     */
+    private String userEmail;
+
+    /**
+     * 用户手机号
+     */
+    private String userPhone;
 
     /**
      * 用户角色：user/admin/ban

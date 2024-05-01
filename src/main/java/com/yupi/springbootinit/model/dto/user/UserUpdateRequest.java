@@ -1,7 +1,8 @@
 package com.yupi.springbootinit.model.dto.user;
 
-import java.io.Serializable;
 import lombok.Data;
+
+import java.io.Serializable;
 
 /**
  * 用户更新请求
@@ -30,6 +31,16 @@ public class UserUpdateRequest implements Serializable {
      * 简介
      */
     private String userProfile;
+
+    /**
+     * 用户邮箱
+     */
+    private String userEmail;
+
+    /**
+     * 用户手机号
+     */
+    private String userPhone;
 
     /**
      * 用户角色：user/admin/ban
