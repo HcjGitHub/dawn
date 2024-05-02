@@ -9,9 +9,12 @@ package com.yupi.springbootinit.constant;
 public interface UserConstant {
 
     /**
-     * 用户登录态键
+     * 用户登录状态缓存key
+     * 格式：user:login:state:{userId}
+     * 过期时间：3小时
+     * 作用：记录用户的登录态，提供访问速度
      */
-    String USER_LOGIN_STATE = "user_login";
+    String USER_LOGIN_STATE = "user:login:state:";
 
     //  region 权限
 

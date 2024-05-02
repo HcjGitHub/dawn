@@ -1,8 +1,11 @@
 package com.yupi.springbootinit.service.impl;
 
+import cn.dev33.satoken.stp.SaLoginConfig;
+import cn.dev33.satoken.stp.StpUtil;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.google.gson.Gson;
 import com.yupi.springbootinit.common.ErrorCode;
 import com.yupi.springbootinit.constant.CommonConstant;
 import com.yupi.springbootinit.exception.BusinessException;
@@ -18,12 +21,15 @@ import lombok.extern.slf4j.Slf4j;
 import me.chanjar.weixin.common.bean.WxOAuth2UserInfo;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.DigestUtils;
 
+import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 import static com.yupi.springbootinit.constant.UserConstant.USER_LOGIN_STATE;
@@ -38,10 +44,14 @@ import static com.yupi.springbootinit.constant.UserConstant.USER_LOGIN_STATE;
 @Slf4j
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
 
+    @Resource
+    private StringRedisTemplate stringRedisTemplate;
+
     /**
      * 盐值，混淆密码
      */
     public static final String SALT = "chenxi";
+
 
     @Override
     public long userRegister(String userAccount, String userPassword, String checkPassword) {
@@ -84,7 +94,7 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     }
 
     @Override
-    public LoginUserVO userLogin(String userAccount, String userPassword, HttpServletRequest request) {
+    public LoginUserVO userLogin(String userAccount, String userPassword, Boolean autoLogin, HttpServletRequest request) {
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "账号密码为空");
@@ -111,8 +121,19 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "密码错误");
         }
         // 3. 记录用户的登录态
-        request.getSession().setAttribute(USER_LOGIN_STATE, user);
-        return this.getLoginUserVO(user);
+        // request.getSession().setAttribute(USER_LOGIN_STATE, user);
+        // 使用 sa-token 记录登录态 配置JWT加密算法 userName作为附加信息 autoLogin->saToken的是否长期有效
+        StpUtil.login(user.getId(), SaLoginConfig.setExtra("userName", user.getUserName()).setIsLastingCookie(autoLogin));
+        // 主动序列化
+        String userJson = new Gson().toJson(user);
+        // 使用Redis 记录用户信息，提供访问速度
+        stringRedisTemplate.opsForValue().set(USER_LOGIN_STATE + user.getId(), userJson, 3, TimeUnit.HOURS);
+        // 4. 返回登录用户信息
+        LoginUserVO loginUserVO = this.getLoginUserVO(user);
+        if (autoLogin) {
+            loginUserVO.setSaToken(StpUtil.getTokenValue());
+        }
+        return loginUserVO;
     }
 
     @Override
@@ -156,18 +177,28 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
     @Override
     public User getLoginUser(HttpServletRequest request) {
         // 先判断是否已登录
-        Object userObj = request.getSession().getAttribute(USER_LOGIN_STATE);
-        User currentUser = (User) userObj;
-        if (currentUser == null || currentUser.getId() == null) {
+        boolean login = StpUtil.isLogin();
+        if (!login) {
             throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
         }
-        // 从数据库查询（追求性能的话可以注释，直接走缓存）
-        long userId = currentUser.getId();
-        currentUser = this.getById(userId);
-        if (currentUser == null) {
-            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR);
+
+        // 获取当前登录用户id
+        long loginUserId = StpUtil.getLoginIdAsLong();
+        // 从缓存查询
+        String userJson = stringRedisTemplate.opsForValue().get(USER_LOGIN_STATE + loginUserId);
+        User user = new Gson().fromJson(userJson, User.class);
+        // 缓存数据刚好过期 兜底方案
+        if (user == null) {
+            // 从数据库查询
+            user = this.getById(loginUserId);
+            if (user == null) {
+                throw new BusinessException(ErrorCode.NOT_FOUND_ERROR, "用户不存在");
+            }
+            // 缓存数据
+            userJson = new Gson().toJson(user);
+            stringRedisTemplate.opsForValue().set(USER_LOGIN_STATE + loginUserId, userJson, 3, TimeUnit.HOURS);
         }
-        return currentUser;
+        return user;
     }
 
     /**
@@ -215,11 +246,18 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      */
     @Override
     public boolean userLogout(HttpServletRequest request) {
-        if (request.getSession().getAttribute(USER_LOGIN_STATE) == null) {
-            throw new BusinessException(ErrorCode.OPERATION_ERROR, "未登录");
+        // 获取当前会话是否已经登录，返回true=已登录，false=未登录
+        boolean login = StpUtil.isLogin();
+
+        if (!login) {
+            throw new BusinessException(ErrorCode.NOT_LOGIN_ERROR, "未登录");
         }
+        // 获取当前登录用户id
+        long loginUserId = StpUtil.getLoginIdAsLong();
         // 移除登录态
-        request.getSession().removeAttribute(USER_LOGIN_STATE);
+        StpUtil.logout();
+        // 移除缓存数据
+        stringRedisTemplate.delete(USER_LOGIN_STATE + loginUserId);
         return true;
     }
 
