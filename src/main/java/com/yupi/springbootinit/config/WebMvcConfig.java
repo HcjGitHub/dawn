@@ -26,7 +26,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
         SaInterceptor saInterceptor = new SaInterceptor(handle -> StpUtil.checkLogin());
         SubSaInterceptor subSaInterceptor = new SubSaInterceptor(saInterceptor);
         registry.addInterceptor(subSaInterceptor).addPathPatterns("/**")
-                .excludePathPatterns("/user/login", "/user/register", "/user/logout", "/user/get/login")
+                .excludePathPatterns("/user/login", "/user/register", "/user/logout", "/user/get/login", "/user/getCaptcha")
                 //放行静态资源
                 .excludePathPatterns("/doc.html", "/swagger-ui.html", "/webjars/**", "/v2/**", "/swagger-resources/**");
     }

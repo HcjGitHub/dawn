@@ -2,6 +2,10 @@ package com.yupi.springbootinit.service.impl;
 
 import cn.dev33.satoken.stp.SaLoginConfig;
 import cn.dev33.satoken.stp.StpUtil;
+import cn.hutool.captcha.CaptchaUtil;
+import cn.hutool.captcha.LineCaptcha;
+import cn.hutool.captcha.ShearCaptcha;
+import cn.hutool.captcha.generator.RandomGenerator;
 import cn.hutool.core.collection.CollUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
@@ -11,6 +15,7 @@ import com.yupi.springbootinit.constant.CommonConstant;
 import com.yupi.springbootinit.exception.BusinessException;
 import com.yupi.springbootinit.mapper.UserMapper;
 import com.yupi.springbootinit.model.dto.user.UserQueryRequest;
+import com.yupi.springbootinit.model.dto.user.UserRegisterRequest;
 import com.yupi.springbootinit.model.entity.User;
 import com.yupi.springbootinit.model.enums.UserRoleEnum;
 import com.yupi.springbootinit.model.vo.LoginUserVO;
@@ -27,6 +32,8 @@ import org.springframework.util.DigestUtils;
 
 import javax.annotation.Resource;
 import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -51,10 +58,49 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
      * 盐值，混淆密码
      */
     public static final String SALT = "chenxi";
-
+    /**
+     * 验证码存储到redis前缀 存储两分钟
+     */
+    public static final String CAPTCHA_PREFIX = "captcha:prefix:";
 
     @Override
-    public long userRegister(String userAccount, String userPassword, String checkPassword) {
+    public void getCaptcha(HttpServletRequest request, HttpServletResponse response) {
+        String signature = request.getHeader("signature");
+        if (StringUtils.isBlank(signature)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
+        }
+
+        //纯数字四位验证码
+        RandomGenerator randomGenerator = new RandomGenerator("0123456789", 4);
+        LineCaptcha lineCaptcha = CaptchaUtil.createLineCaptcha(100, 30);
+        lineCaptcha.setGenerator(randomGenerator);
+        ShearCaptcha captcha = CaptchaUtil.createShearCaptcha(200, 45, 4, 4);
+
+        try {
+            //设置响应头
+            response.setContentType("image/jpeg");
+            response.setHeader("Pragma", "No-cache");
+
+            //写回前端页面
+            lineCaptcha.write(response.getOutputStream());
+
+            log.info("captchaId:{}，code:{}", signature, lineCaptcha.getCode());
+            // 将验证码设置到Redis中,2分钟过期
+            stringRedisTemplate.opsForValue().set(CAPTCHA_PREFIX + signature, lineCaptcha.getCode(), 2, TimeUnit.MINUTES);
+            response.getOutputStream().close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Override
+    public long userRegister(UserRegisterRequest userRegisterRequest, String signature) {
+        String userAccount = userRegisterRequest.getUserAccount();
+        String userPassword = userRegisterRequest.getUserPassword();
+        String checkPassword = userRegisterRequest.getCheckPassword();
+
+        String captcha = userRegisterRequest.getCaptcha();
+
         // 1. 校验
         if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "参数为空");
@@ -68,6 +114,15 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements Us
         // 密码和校验密码相同
         if (!userPassword.equals(checkPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR, "两次输入的密码不一致");
+        }
+        // 验证码校验
+        if (captcha.length() < 4) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码输入错误");
+        }
+        //获取redis中保存的验证码
+        String code = stringRedisTemplate.opsForValue().get(CAPTCHA_PREFIX + signature);
+        if (!captcha.equals(code)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR, "验证码输入错误");
         }
         synchronized (userAccount.intern()) {
             // 账户不能重复

@@ -1,6 +1,5 @@
 package com.yupi.springbootinit.controller;
 
-import cn.dev33.satoken.stp.StpUtil;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.yupi.springbootinit.annotation.AuthCheck;
@@ -50,7 +49,18 @@ public class UserController {
     @Resource
     private WxOpenConfig wxOpenConfig;
 
-    // region 登录相关
+    // region 登录注册相关
+
+    /**
+     * 获取图片验证码
+     *
+     * @param request
+     * @param response
+     */
+    @GetMapping("/getCaptcha")
+    public void getCaptcha(HttpServletRequest request, HttpServletResponse response) {
+        userService.getCaptcha(request, response);
+    }
 
     /**
      * 用户注册
@@ -59,17 +69,16 @@ public class UserController {
      * @return
      */
     @PostMapping("/register")
-    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest) {
+    public BaseResponse<Long> userRegister(@RequestBody UserRegisterRequest userRegisterRequest, HttpServletRequest request) {
         if (userRegisterRequest == null) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        String userAccount = userRegisterRequest.getUserAccount();
-        String userPassword = userRegisterRequest.getUserPassword();
-        String checkPassword = userRegisterRequest.getCheckPassword();
-        if (StringUtils.isAnyBlank(userAccount, userPassword, checkPassword)) {
-            return null;
+        String signature = request.getHeader("signature");
+
+        if (StringUtils.isAnyBlank(signature)) {
+            throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        long result = userService.userRegister(userAccount, userPassword, checkPassword);
+        long result = userService.userRegister(userRegisterRequest, signature);
         return ResultUtils.success(result);
     }
 
@@ -91,7 +100,7 @@ public class UserController {
         if (StringUtils.isAnyBlank(userAccount, userPassword)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
-        LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword,autoLogin, request);
+        LoginUserVO loginUserVO = userService.userLogin(userAccount, userPassword, autoLogin, request);
         return ResultUtils.success(loginUserVO);
     }
 
