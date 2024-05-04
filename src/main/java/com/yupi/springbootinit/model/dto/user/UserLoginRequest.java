@@ -19,4 +19,10 @@ public class UserLoginRequest implements Serializable {
     private String userPassword;
 
     private Boolean autoLogin;
+
+    /**
+     * 邮箱登录
+     */
+    private String emailNum;
+    private String emailCaptcha;
 }

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>晨曦 - 邮箱验证</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: rgb(85, 85, 84);
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            width: 70%;
+            margin: 20px auto;
+            background-color: rgb(255, 255, 255);
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        strong {
+            color: #0048ff;
+        }
+        p {
+            font-size: 16px;
+            line-height: 1.6;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            color: #999;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>晨曦交流平台</h1>
+    <p>
+        亲爱的 <b th:text="${email}"></b>, 您好! 😃
+    </p>
+    <p>
+        您的 <span th:text="${type}"></span> 验证码是: <strong th:text="${code}"></strong>
+    </p>
+    <p>
+        请在页面中输入此验证码完成验证。
+    </p>
+    <p>
+        如果您未请求此验证码，请忽略此邮件。
+    </p>
+    <p class="footer">
+        此邮件由系统自动发送，请勿回复。
+    </p>
+</div>
+</body>
+</html>

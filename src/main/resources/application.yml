@@ -40,6 +40,24 @@ spring:
         max-idle: 10
         # 连接池中的最小空闲连接
         min-idle: 0
+  # RabbitMQ 配置
+  rabbitmq:
+    host: 127.0.0.1
+    port: 5672
+    username: huang
+    password: huang
+    virtualHost: /
+  # 邮件配置
+  mail:
+    # 邮箱服务器
+    host: smtp.qq.com
+    username: 3293817855@qq.com
+    # 客户端授权码
+    password: dlicznlznqandaag
+    protocol: smtps
+    default-encoding: UTF-8
+    # smtp-25 smtps-465
+    port: 465
   # Elasticsearch 配置
   # todo 需替换配置，然后取消注释
   #  elasticsearch:
